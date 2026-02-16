@@ -5,25 +5,36 @@ import type { Phrase } from '../types';
 
 export const useSpeechRecognition = () => {
   const recognitionServiceRef = useRef<SpeechRecognitionService | null>(null);
+  const isRecordingRef = useRef(false);
   const { isRecording, setIsRecording, setCurrentPhrase, addPhraseToHistory, setError } =
     useRecognitionStore();
 
-  // 音声認識サービスの初期化
+  // isRecordingの値をrefに同期
   useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
+  // 音声認識サービスの初期化（マウント時のみ）
+  useEffect(() => {
+    console.log('Initializing speech recognition service...');
     recognitionServiceRef.current = new SpeechRecognitionService();
 
     const service = recognitionServiceRef.current;
 
     // ブラウザ対応チェック
     if (!service.isSupported()) {
+      console.error('Speech recognition not supported');
       setError(
         'このブラウザは音声認識に対応していません。Safariまたはchromeをお使いください。'
       );
       return;
     }
 
+    console.log('Speech recognition service initialized');
+
     // 音声認識結果を受け取るコールバック
     service.onResult((text: string, isFinal: boolean) => {
+      console.log('Recognition result:', text, 'isFinal:', isFinal);
       const phrase: Phrase = {
         id: `${Date.now()}-${Math.random()}`,
         text,
@@ -72,8 +83,10 @@ export const useSpeechRecognition = () => {
 
     // 認識終了時（自動再起動）
     service.onEnd(() => {
+      console.log('Recognition ended, isRecording:', isRecordingRef.current);
       // 録音中だった場合は自動的に再起動
-      if (isRecording) {
+      if (isRecordingRef.current) {
+        console.log('Auto-restarting recognition...');
         setTimeout(() => {
           try {
             service.start();
@@ -86,19 +99,23 @@ export const useSpeechRecognition = () => {
     });
 
     return () => {
+      console.log('Cleaning up speech recognition service');
       if (recognitionServiceRef.current) {
         recognitionServiceRef.current.stop();
       }
     };
-  }, [isRecording, setIsRecording, setCurrentPhrase, addPhraseToHistory, setError]);
+  }, [setIsRecording, setCurrentPhrase, addPhraseToHistory, setError]);
 
   // 録音開始
   const startRecording = useCallback(() => {
+    console.log('startRecording called');
     if (!recognitionServiceRef.current) {
+      console.error('Recognition service not initialized');
       setError('音声認識サービスが初期化されていません');
       return;
     }
 
+    console.log('Starting recognition...');
     setError(null);
     setIsRecording(true);
     recognitionServiceRef.current.start();
@@ -106,10 +123,12 @@ export const useSpeechRecognition = () => {
 
   // 録音停止
   const stopRecording = useCallback(() => {
+    console.log('stopRecording called');
     if (!recognitionServiceRef.current) {
       return;
     }
 
+    console.log('Stopping recognition...');
     setIsRecording(false);
     recognitionServiceRef.current.stop();
   }, [setIsRecording]);
